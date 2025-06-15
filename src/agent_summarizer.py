@@ -1,0 +1,86 @@
+import json
+import logging
+from typing import Dict, Any, List
+from configs.openai_config import openai_llm
+from src.state import DocState
+from langchain.schema import SystemMessage, HumanMessage
+
+def summarize(inputs: dict) -> dict:
+    """
+    Genera resúmenes, puntos clave y acciones recomendadas para cada documento.
+    """
+    docs = inputs.get('documents', [])
+    summarized = []
+    
+    for doc in docs:
+        title = doc.get('title')
+        text = doc.get('text', '')
+
+        prompt = (
+            f"Eres un asistente experto en análisis documental. Resume el siguiente "
+            f"documento de forma profesional en no más de 200 palabras. Si el texto "
+            f"tiene múltiples secciones, incluye una oración clave por sección. No "
+            f"repitas el texto, sintetízalo. "
+            f"Genera un JSON con clave 'summary' (resumen breve) y 'key_points' (lista de bullets) "
+            f"para el siguiente texto titulado '{title}':\n\n{text[:5000]}"
+        )
+        
+        try:
+            messages = [
+                SystemMessage(content="Eres un asistente experto en análisis documental."),
+                HumanMessage(content=prompt)
+            ]
+            out = openai_llm.invoke(messages)
+            res = json.loads(out.content)
+        except json.JSONDecodeError:
+            res = {'summary': out.content.strip(), 'key_points': []}
+        except Exception as e:
+            logging.error(f"Error al generar resumen: {str(e)}")
+            res = {
+                'summary': "Error al generar resumen",
+                'key_points': [],
+                'error': str(e)
+            }
+
+        meta = doc.get('metadata', {})
+        meta['summary'] = res.get('summary')
+        meta['key_points'] = res.get('key_points', [])
+        meta['recommended_actions'] = res.get('recommended_actions', [])
+
+        summarized.append({
+            'title': title,
+            'text': text,
+            'metadata': meta
+        })
+
+    inputs['documents'] = summarized
+    logging.info(f"[SummarizerAgent] Generados resúmenes para {len(summarized)} documentos")
+    return inputs
+
+def run_summarizer(state: DocState) -> DocState:
+    """
+    Enriquece cada documento con resúmenes, puntos clave y acciones recomendadas.
+    """
+    payload = {
+        "documents": state["documents"],
+        "source_stats": state["source_stats"]
+    }
+
+    result = summarize(payload)
+
+    # Actualizar los metadatos de cada documento
+    for idx, doc_enriquecido in enumerate(result["documents"]):
+        meta_enriquecido = doc_enriquecido.get("metadata", {})
+        
+        # Asegurar que existe el diccionario de metadata
+        if "metadata" not in state["documents"][idx]:
+            state["documents"][idx]["metadata"] = {}
+            
+        # Actualizar los campos de metadata
+        state["documents"][idx]["metadata"].update({
+            "summary": meta_enriquecido.get("summary"),
+            "key_points": meta_enriquecido.get("key_points", []),
+            "recommended_actions": meta_enriquecido.get("recommended_actions", [])
+        })
+
+    return state

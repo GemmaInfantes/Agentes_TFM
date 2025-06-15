@@ -1,0 +1,52 @@
+# Dependencias del sistema
+pip>=25.0.0
+setuptools>=69.0.0
+wheel>=0.42.0
+
+# Dependencias principales
+numpy==1.26.4
+langdetect
+langchain
+langchain-community
+fasttext-wheel
+langchain-core
+langchain-openai
+langgraph
+openai
+pymilvus
+unstructured
+spacy
+docx2txt
+streamlit==1.32.0
+keybert
+bertopic
+python-docx==1.1.2
+torch==2.2.0
+
+# Azure
+azure-core>=1.29.7
+azure-identity>=1.15.0
+azure-ai-ml>=1.12.1
+
+# Procesamiento de documentos
+python-docx==1.1.2
+docx2txt==0.8
+unstructured==0.17.2
+PyPDF2==3.0.1
+pymilvus==2.5.10
+
+# NLP y análisis de texto
+bertopic==0.17.0
+langdetect==1.0.9
+sentence-transformers==2.2.2
+tiktoken==0.5.2
+fasttext-wheel==0.9.2
+
+# Interfaz de usuario
+streamlit==1.45.1
+
+# Modelos de lenguaje
+spacy==3.8.7
+keybert==0.9.0
+
+# Nota: spacy-model-en_core_web_sm se instalará por separado

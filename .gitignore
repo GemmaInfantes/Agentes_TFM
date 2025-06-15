@@ -1,0 +1,92 @@
+# Configuración y secretos
+configs/
+.env
+*.env
+
+# Archivos de Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Entornos virtuales
+venv/
+env/
+ENV/
+.env/
+.venv/
+env.bak/
+venv.bak/
+
+# Archivos temporales
+uploaded_docs/*
+!uploaded_docs/.gitkeep
+*.tmp
+*.temp
+*.log
+*.swp
+
+# IDEs y editores
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+.project
+.pydevproject
+.settings/
+*.code-workspace
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Archivos de caché de Jupyter
+.ipynb_checkpoints/
+*/.ipynb_checkpoints/*
+
+# Archivos de base de datos y vectores
+*.db
+*.sqlite
+*.sqlite3
+*.vec
+*.bin
+*.idx
+*.npy
+*.npz
+
+# Archivos de modelos y checkpoints
+*.pt
+*.pth
+*.h5
+*.hdf5
+*.pkl
+*.joblib
+*.model
+checkpoints/
+models/
+
+# Archivos de documentación generados
+docs/_build/
+site/
+
+# Archivos de dependencias
+node_modules/
+package-lock.json
+yarn.lock 
