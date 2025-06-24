@@ -31,7 +31,13 @@ def summarize(inputs: dict) -> dict:
                 HumanMessage(content=prompt)
             ]
             out = openai_llm.invoke(messages)
-            res = json.loads(out.content)
+            content = out.content.strip()
+            if content.startswith("```json"):
+                content = content[7:]
+            if content.endswith("```"):
+                content = content[:-3]
+            content = content.strip()
+            res = json.loads(content)
         except json.JSONDecodeError:
             res = {'summary': out.content.strip(), 'key_points': []}
         except Exception as e:
@@ -43,9 +49,12 @@ def summarize(inputs: dict) -> dict:
             }
 
         meta = doc.get('metadata', {})
-        meta['summary'] = res.get('summary')
-        meta['key_points'] = res.get('key_points', [])
-        meta['recommended_actions'] = res.get('recommended_actions', [])
+        summary = res.get("summary")
+        key_points = res.get("key_points", [])
+        recommended_actions = res.get("recommended_actions", [])
+        meta['summary'] = summary
+        meta['key_points'] = key_points
+        meta['recommended_actions'] = recommended_actions
 
         summarized.append({
             'title': title,
@@ -71,16 +80,15 @@ def run_summarizer(state: DocState) -> DocState:
     # Actualizar los metadatos de cada documento
     for idx, doc_enriquecido in enumerate(result["documents"]):
         meta_enriquecido = doc_enriquecido.get("metadata", {})
-        
-        # Asegurar que existe el diccionario de metadata
-        if "metadata" not in state["documents"][idx]:
-            state["documents"][idx]["metadata"] = {}
-            
-        # Actualizar los campos de metadata
-        state["documents"][idx]["metadata"].update({
-            "summary": meta_enriquecido.get("summary"),
-            "key_points": meta_enriquecido.get("key_points", []),
-            "recommended_actions": meta_enriquecido.get("recommended_actions", [])
-        })
+        summary = meta_enriquecido.get("summary")
+        key_points = meta_enriquecido.get("key_points", [])
+        recommended_actions = meta_enriquecido.get("recommended_actions", [])
+        if "metadatos" not in state:
+            state["metadatos"] = []
+        while len(state["metadatos"]) <= idx:
+            state["metadatos"].append({})
+        state["metadatos"][idx]["summary"] = summary
+        state["metadatos"][idx]["key_points"] = key_points
+        state["metadatos"][idx]["recommended_actions"] = recommended_actions
 
     return state

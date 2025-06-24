@@ -50,5 +50,14 @@ def run_metadata(state: DocState) -> DocState:
         "source_stats": state["source_stats"]
     }
     result = extract_metadata(payload)
-    state["documents"] = result["documents"]
+    # Actualizar los metadatos en state['metadatos']
+    for idx, doc_enriquecido in enumerate(result["documents"]):
+        language = doc_enriquecido.get("metadata", {}).get("language")
+        token_count = doc_enriquecido.get("metadata", {}).get("token_count")
+        if "metadatos" not in state:
+            state["metadatos"] = []
+        while len(state["metadatos"]) <= idx:
+            state["metadatos"].append({})
+        state["metadatos"][idx]["language"] = language
+        state["metadatos"][idx]["token_count"] = token_count
     return state

@@ -4,6 +4,7 @@ from src.state import DocState
 from src.graph_builder import build_graph
 from typing import Dict, Any
 import numpy as np
+import json
 
 # Configuración de la página
 st.set_page_config(
@@ -103,7 +104,11 @@ if uploaded_file:
                             for doc in state["documents"]:
                                 if "metadata" in doc and "summary" in doc["metadata"]:
                                     st.write(f"**{doc['title']}**")
-                                    st.write(doc["metadata"]["summary"])
+                                    summary = doc["metadata"]["summary"]
+                                    if isinstance(summary, dict) or isinstance(summary, list):
+                                        st.markdown(f'```json\n{json.dumps(summary, ensure_ascii=False, indent=2)}\n```')
+                                    else:
+                                        st.markdown(summary)
                                     st.markdown("---")
                     tab_idx += 1
                 

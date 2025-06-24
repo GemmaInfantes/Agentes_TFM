@@ -2,6 +2,8 @@ import logging
 from typing import List, Dict, Any
 from sentence_transformers import SentenceTransformer
 from src.state import DocState
+from pymilvus import Collection, CollectionSchema, FieldSchema, DataType, connections, utility
+import json
 
 # --------------------------------------------------------------------
 # 3) VectorizerAgent e IndexerAgent (con wrappers)
@@ -119,4 +121,26 @@ def run_vectorizer(state: DocState) -> DocState:
     logging.info(f"[VectorizerAgent] - Número de embeddings generados: {len(resultado['embeddings'])}")
     logging.info(f"[VectorizerAgent] - Número de metadatos procesados: {len(resultado['metadatos'])}")
     
+    logging.info(f"Ejemplo de metadato a insertar: {json.dumps(resultado['metadatos'][0], indent=2, ensure_ascii=False)}")
+    
     return state
+
+connections.connect(alias="default", host="localhost", port="19530")
+
+collection_name = "documentos_legales_v2"
+
+if collection_name not in utility.list_collections():
+    fields = [
+        FieldSchema(name="id", dtype=DataType.INT64, is_primary=True, auto_id=True),
+        FieldSchema(name="embedding", dtype=DataType.FLOAT_VECTOR, dim=384),
+        FieldSchema(name="metadata", dtype=DataType.JSON)
+    ]
+    schema = CollectionSchema(fields, description="Colección de embeddings y metadatos")
+    c = Collection(name=collection_name, schema=schema)
+    print("Colección creada")
+else:
+    c = Collection(collection_name)
+    print("Colección ya existe")
+
+print("Número de entidades:", c.num_entities)
+
