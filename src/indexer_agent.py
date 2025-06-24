@@ -63,19 +63,19 @@ class IndexerAgent:
     def run(
         self,
         embeddings: List[List[float]],
-        metadatos: List[Dict[str, Any]]
+        metadata: List[Dict[str, Any]]
     ) -> Dict[str, Any]:
         """
         embeddings: lista de vectores (List[List[float]])
-        metadatos:  lista de diccionarios JSON (List[Dict[str, Any]])
+        metadata:  lista de diccionarios JSON (List[Dict[str, Any]])
         """
-        logging.info(f"[IndexerAgent] Iniciando indexación con {len(embeddings)} embeddings y {len(metadatos)} metadatos")
+        logging.info(f"[IndexerAgent] Iniciando indexación con {len(embeddings)} embeddings y {len(metadata)} metadatos")
         
         if not isinstance(embeddings, list) or not embeddings:
             raise ValueError("Se esperaba una lista no vacía de embeddings.")
-        if not isinstance(metadatos, list) or not metadatos:
+        if not isinstance(metadata, list) or not metadata:
             raise ValueError("Se esperaba una lista no vacía de metadatos.")
-        if len(embeddings) != len(metadatos):
+        if len(embeddings) != len(metadata):
             raise ValueError("La longitud de embeddings y metadatos debe coincidir.")
 
         dim = len(embeddings[0])
@@ -89,6 +89,31 @@ class IndexerAgent:
         # Conectarse o crear la colección según sea necesario
         self._get_or_create_collection(dim)
 
+        # Validar que cada metadato es un dict plano
+        metadata_limpios = []
+        for idx, meta in enumerate(metadata):
+            if not isinstance(meta, dict):
+                raise ValueError(f"El metadato en la posición {idx} no es un dict.")
+            # Eliminar claves anidadas no deseadas
+            meta_plano = dict(meta)  # copia
+            if "metadata" in meta_plano:
+                inner = meta_plano.pop("metadata")
+                if isinstance(inner, dict):
+                    meta_plano.update(inner)
+            if "metadatos" in meta_plano:
+                inner = meta_plano.pop("metadatos")
+                if isinstance(inner, dict):
+                    meta_plano.update(inner)
+            metadata_limpios.append(meta_plano)
+
+        # LOGS DE DEPURACIÓN ANTES DE INSERTAR
+        logging.info(f"[IndexerAgent] Embeddings a insertar: {len(embeddings)}")
+        logging.info(f"[IndexerAgent] Metadata a insertar: {len(metadata_limpios)}")
+        if metadata_limpios:
+            logging.info(f"[IndexerAgent] Ejemplo de metadata: {metadata_limpios[0]}")
+        else:
+            logging.info(f"[IndexerAgent] Metadata está VACÍO")
+
         # Preparar los datos para insertar: 
         # Milvus espera una lista de columnas, en el mismo orden en que definimos los FieldSchema
         # (omitimos 'id' porque es auto_id):
@@ -96,8 +121,9 @@ class IndexerAgent:
         #   - columna metadatos  (JSON)
         insert_data = [
             embeddings,   # FIELD 1: FLOAT_VECTOR
-            metadatos     # FIELD 2: JSON
+            metadata_limpios     # FIELD 2: JSON (dict plano)
         ]
+        logging.info(f"[IndexerAgent] Ejemplo de metadato a insertar: {metadata_limpios[0] if metadata_limpios else 'VACÍO'}")
         logging.info(f"[IndexerAgent] Preparando inserción de datos...")
         
         try:
@@ -141,15 +167,15 @@ indexer = IndexerAgent()
 
 def run_indexer(state: DocState) -> DocState:
     """
-    Toma state['embeddings'] y state['metadatos'] y los inserta en Milvus.
-    Por defecto, state['metadatos'] es la lista de dicts que generaron los agentes anteriores.
+    Toma state['embeddings'] y state['metadata'] y los inserta en Milvus.
+    Por defecto, state['metadata'] es la lista de dicts que generaron los agentes anteriores.
     """
     embeddings = state.get("embeddings", [])
-    metadatos  = state.get("metadatos", [])
+    metadata  = state.get("metadatos", [])
 
-    if not embeddings or not metadatos:
+    if not embeddings or not metadata:
         raise ValueError("Faltan embeddings o metadatos en el estado para indexar.")
 
-    result = indexer.run(embeddings, metadatos)
+    result = indexer.run(embeddings, metadata)
     state["index_result"] = result
     return state

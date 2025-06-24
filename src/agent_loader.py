@@ -3,12 +3,60 @@ import os
 import json
 import logging
 import datetime
+import re
 from langchain_community.document_loaders import PyPDFLoader, TextLoader, UnstructuredWordDocumentLoader
 from typing import Dict, Any
+# NUEVO: para metadatos nativos
+from PyPDF2 import PdfReader
+from docx import Document as DocxDocument
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+def clean_text(text):
+    # Limpieza avanzada: elimina caracteres no ASCII, normaliza espacios y saltos de línea
+    text = re.sub(r'[\r\f\x0b]', ' ', text)  # elimina retornos de carro y form feeds
+    text = re.sub(r'[\u200b\u200c\u200d\ufeff]', '', text)  # elimina espacios unicode invisibles
+    text = re.sub(r'[^\x00-\x7F]+', ' ', text)  # elimina caracteres no ASCII
+    text = re.sub(r'\s+', ' ', text)  # normaliza espacios
+    text = re.sub(r'\n+', '\n', text)  # normaliza saltos de línea
+    return text.strip()
+
+def extract_pdf_metadata(path):
+    try:
+        reader = PdfReader(path)
+        meta = reader.metadata or {}
+        return {
+            'author': meta.get('/Author'),
+            'title_pdf': meta.get('/Title'),
+            'creation_date': meta.get('/CreationDate'),
+            'producer': meta.get('/Producer'),
+            'creator': meta.get('/Creator'),
+            'moddate': meta.get('/ModDate')
+        }
+    except Exception as e:
+        logging.warning(f"No se pudieron extraer metadatos PDF: {e}")
+        return {}
+
+def extract_docx_metadata(path):
+    try:
+        doc = DocxDocument(path)
+        core = doc.core_properties
+        return {
+            'author': core.author,
+            'title_docx': core.title,
+            'created': str(core.created),
+            'last_modified_by': core.last_modified_by,
+            'last_printed': str(core.last_printed),
+            'modified': str(core.modified),
+            'category': core.category,
+            'comments': core.comments,
+            'subject': core.subject
+        }
+    except Exception as e:
+        logging.warning(f"No se pudieron extraer metadatos DOCX: {e}")
+        return {}
 
 def load_document(inputs: dict) -> dict:
     """
@@ -31,7 +79,7 @@ def load_document(inputs: dict) -> dict:
         try:
             ext = os.path.splitext(path)[1].lower()
             logger.info(f"Procesando archivo: {path} (extensión: {ext})")
-            
+            meta_extra = {}
             if ext == '.pdf':
                 # Cargar PDF
                 loader = PyPDFLoader(path)
@@ -39,11 +87,10 @@ def load_document(inputs: dict) -> dict:
                 
                 # Combinar todas las páginas en un solo documento
                 combined_text = "\n".join(page.page_content for page in pages)
+                combined_text = clean_text(combined_text)
                 
                 # Extraer metadatos del PDF
-                pdf_meta = {}
-                if hasattr(loader, 'metadata'):
-                    pdf_meta = loader.metadata
+                meta_extra = extract_pdf_metadata(path)
                 
                 # Crear un solo documento con el texto combinado
                 documents.append({
@@ -52,12 +99,7 @@ def load_document(inputs: dict) -> dict:
                     'metadata': {
                         'source': path,
                         'total_pages': len(pages),
-                        'author': pdf_meta.get('author'),
-                        'title_pdf': pdf_meta.get('title'),
-                        'creation_date': pdf_meta.get('creation_date'),
-                        'producer': pdf_meta.get('producer'),
-                        'creator': pdf_meta.get('creator'),
-                        'moddate': pdf_meta.get('moddate')
+                        **meta_extra
                     }
                 })
                 total_pages += len(pages)
@@ -71,6 +113,7 @@ def load_document(inputs: dict) -> dict:
                     with open(path, 'r', encoding='latin-1') as f:
                         content = f.read()
                 
+                content = clean_text(content)
                 documents.append({
                     'title': os.path.splitext(os.path.basename(path))[0],
                     'text': content,
@@ -81,11 +124,30 @@ def load_document(inputs: dict) -> dict:
                 })
                 total_pages += 1
                 
-            else:
+            elif ext in ['.docx', '.doc']:
                 # Cargar otros tipos de documentos
                 loader = UnstructuredWordDocumentLoader(path)
                 pages = loader.load()
                 text = "".join(p.page_content for p in pages)
+                text = clean_text(text)
+                
+                meta_extra = extract_docx_metadata(path)
+                documents.append({
+                    'title': os.path.splitext(os.path.basename(path))[0],
+                    'text': text,
+                    'metadata': {
+                        'source': path,
+                        'total_pages': len(pages),
+                        **meta_extra
+                    }
+                })
+                total_pages += len(pages)
+            
+            else:
+                # Otros tipos: solo limpieza
+                loader = UnstructuredWordDocumentLoader(path)
+                pages = loader.load()
+                text = clean_text("".join(p.page_content for p in pages))
                 
                 documents.append({
                     'title': os.path.splitext(os.path.basename(path))[0],

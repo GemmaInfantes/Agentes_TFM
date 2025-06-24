@@ -4,8 +4,32 @@ from typing import Dict, Any, List
 from configs.openai_config import openai_llm
 from src.state import DocState
 from langchain.schema import SystemMessage, HumanMessage
+import re
 
-# 2.6) StructureAgent
+def extract_index(text):
+    # Busca títulos/secciones por patrones comunes (mayúsculas, numeración, etc.)
+    pattern = re.compile(r'^(\d+\.|[A-ZÁÉÍÓÚÑ ]{4,}|[IVXLCDM]+\.|[A-Z][a-z]+:)', re.MULTILINE)
+    matches = pattern.findall(text)
+    return list(set([m.strip() for m in matches if m.strip()]))
+
+def detect_structural_patterns(text):
+    patterns = {
+        'questions': len(re.findall(r'\?\s', text)),
+        'lists': len(re.findall(r'\n\s*[-*•]\s', text)),
+        'quotes': len(re.findall(r'"[^"]+"', text)),
+        'citations': len(re.findall(r'\[(\d+)\]', text)),
+    }
+    return patterns
+
+def extract_references(text):
+    # Busca secciones de referencias/bibliografía
+    refs = []
+    ref_section = re.search(r'(Referencias|Bibliografía|References|Bibliography)[\s\n\r:]+(.+)', text, re.IGNORECASE|re.DOTALL)
+    if ref_section:
+        refs_text = ref_section.group(2)
+        refs = [line.strip() for line in refs_text.split('\n') if line.strip()]
+    return refs[:10]  # máximo 10 referencias
+
 def extract_structure(inputs: dict) -> dict:
     """
     Extrae la estructura jerárquica de cada documento usando el modelo de lenguaje.
@@ -15,7 +39,13 @@ def extract_structure(inputs: dict) -> dict:
     for doc in docs:
         title = doc.get('title')
         text = doc.get('text', '')
-
+        # Índice automático
+        auto_index = extract_index(text)
+        # Patrones estructurales
+        structural_patterns = detect_structural_patterns(text)
+        # Referencias/bibliografía
+        references = extract_references(text)
+        # LLM para estructura jerárquica
         prompt = (
             f"Eres un asistente experto en analizar la estructura de documentos legales. "
             f"Analiza el siguiente texto y extrae su estructura jerárquica. "
@@ -61,6 +91,9 @@ def extract_structure(inputs: dict) -> dict:
 
         meta = doc.get('metadata', {})
         meta['structure'] = structure
+        meta['auto_index'] = auto_index
+        meta['structural_patterns'] = structural_patterns
+        meta['references'] = references
         enriched.append({
             'title': title,
             'text': text,
@@ -85,11 +118,12 @@ def run_structure(state: DocState) -> DocState:
 
     # Actualizar la estructura en cada documento
     for idx, doc_enriquecido in enumerate(result["documents"]):
-        structure = doc_enriquecido.get("metadata", {}).get("structure", [])
-        if "metadatos" not in state:
-            state["metadatos"] = []
-        if len(state["metadatos"]) <= idx:
-            state["metadatos"].append({})
-        state["metadatos"][idx]["structure"] = structure
+        meta = doc_enriquecido.get("metadata", {})
+        for key in ["structure", "auto_index", "structural_patterns", "references"]:
+            if "metadatos" not in state:
+                state["metadatos"] = []
+            if len(state["metadatos"]) <= idx:
+                state["metadatos"].append({})
+            state["metadatos"][idx][key] = meta.get(key)
 
     return state

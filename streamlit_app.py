@@ -94,21 +94,42 @@ if uploaded_file:
                 
                 if show_metadata:
                     with tabs[tab_idx]:
+                        # Mostrar source_stats como resumen general
                         if "source_stats" in state:
+                            st.subheader("Estadísticas de carga")
                             st.json(state["source_stats"])
+                        # Mostrar metadatos enriquecidos de cada documento
+                        if "documents" in state:
+                            for doc in state["documents"]:
+                                st.markdown(f"**{doc['title']}**")
+                                if "metadata" in doc:
+                                    meta = doc["metadata"]
+                                    # Mostrar campos clave de forma bonita, solo si tienen valor y sin duplicados
+                                    shown_keys = set()
+                                    for key in ["source", "author", "title_docx", "created", "last_modified_by", "last_printed", "modified", "category", "comments", "subject"]:
+                                        if key not in shown_keys:
+                                            value = meta.get(key, None)
+                                            if value not in (None, "", "None"):
+                                                st.write(f"**{key}:** {value}")
+                                                shown_keys.add(key)
+                                st.markdown("---")
                     tab_idx += 1
                 
                 if show_summary:
                     with tabs[tab_idx]:
                         if "documents" in state:
                             for doc in state["documents"]:
-                                if "metadata" in doc and "summary" in doc["metadata"]:
+                                if "metadata" in doc:
                                     st.write(f"**{doc['title']}**")
-                                    summary = doc["metadata"]["summary"]
-                                    if isinstance(summary, dict) or isinstance(summary, list):
-                                        st.markdown(f'```json\n{json.dumps(summary, ensure_ascii=False, indent=2)}\n```')
-                                    else:
-                                        st.markdown(summary)
+                                    meta = doc["metadata"]
+                                    # Mostrar resumen abstractivo
+                                    if "summary_abstract" in meta:
+                                        st.subheader("Resumen (abstractivo)")
+                                        st.markdown(meta["summary_abstract"])
+                                    # Mostrar resumen extractivo
+                                    if "summary_extractive" in meta:
+                                        st.subheader("Resumen (extractivo)")
+                                        st.markdown(meta["summary_extractive"])
                                     st.markdown("---")
                     tab_idx += 1
                 

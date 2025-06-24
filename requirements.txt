@@ -50,3 +50,14 @@ spacy==3.8.7
 keybert==0.9.0
 
 # Nota: spacy-model-en_core_web_sm se instalará por separado
+
+# Dependencias básicas
+httpx
+python-dotenv
+
+# Agentes avanzados y procesamiento
+sumy
+nltk
+dateparser
+
+
